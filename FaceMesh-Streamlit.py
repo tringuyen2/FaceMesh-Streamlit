@@ -5,6 +5,7 @@ import tempfile
 import time
 from PIL import Image
 import numpy as np
+from streamlit_webrtc import VideoTransformerBase, webrtc_streamer
 
 
 mp_drawing = mp.solutions.drawing_utils
@@ -56,7 +57,7 @@ def image_resize(image, width=None, height=None, inter=cv2.INTER_AREA):
     return resized
 
 
-app_mode = st.sidebar.selectbox('Choose the App mode', ['About App', 'Run on Image', 'Run on Video'])
+app_mode = st.sidebar.selectbox('Choose the App mode', ['About App', 'Run on Image', 'Run on Video', 'Run on Webcam'])
 
 
 if app_mode == 'About App':
@@ -301,6 +302,119 @@ elif app_mode == 'Run on Video':
 
             vid.release()
             out.release
+
+elif app_mode == 'Run on Webcam':
+
+
+    drawing_spec = mp_drawing.DrawingSpec(thickness=2, circle_radius=1)
+    st.sidebar.markdown('---')
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"][aria-expanded="true] > div:first-child{
+            width: 350px
+        }
+        [data-testid="stSidebar"][aria-expanded="false"] > div: first-child{
+            width: 350px
+            margin-left: -350px
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+
+    )
+
+    max_faces = st.sidebar.number_input('Maximum Number of Face', value=5, min_value=1)
+    st.sidebar.markdown('---')
+    detection_confidence = st.sidebar.slider('Min Detection Confidence', min_value=0.0, max_value=1.0, value=0.5)
+    tracking_confidence = st.sidebar.slider('Min Tracking Confidence', min_value=0.0, max_value=1.0, value=0.5)
+    st.sidebar.markdown('---')
+
+    st.markdown("## Output")
+
+    stframe = st.empty()
+    
+    
+    #Recording Part
+    # codec = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
+    # out = cv2.VideoWriter('output1.mp4', codec, fps_input, (width, height))
+
+    st.sidebar.text('Input Video')
+    # st.sidebar.video(tffile.name)
+
+    fps = 0
+    i = 0
+
+    kpi1, kpi2 = st.columns(2)
+
+    with kpi1:
+        st.markdown("**Frame Rate**")
+        kpi1_text = st.markdown("0")
+    
+    with kpi2:
+        st.markdown("**Detected Faces**")
+        kpi2_text = st.markdown("0")
+
+
+    
+    st.markdown("<hr/>", unsafe_allow_html=True)
+
+
+
+    # face_count = 0
+    # prevTime = 0
+
+    class VideoTransformer(VideoTransformerBase):
+        def __init__(self):
+            self.detection_confidence = detection_confidence
+            self.tracking_confidence = tracking_confidence
+            self.max_face = max_faces
+
+            
+
+
+
+        def transform(self, frame):
+
+            img = frame.to_ndarray(format="bgr24")
+
+            face_count = 0
+            with mp_face_mesh.FaceMesh(
+                max_num_faces = self.max_face,
+                min_detection_confidence = self.detection_confidence,
+                min_tracking_confidence = self.tracking_confidence
+                ) as face_mesh:
+                    results = face_mesh.process(img)
+                    if results.multi_face_landmarks:
+                        # Face Landmark Drawing
+                        
+                        for face_landmarks in results.multi_face_landmarks:
+                            face_count += 1
+
+                            mp_drawing.draw_landmarks(
+                                image = img,
+                                landmark_list = face_landmarks,
+                                connections = mp_face_mesh.FACEMESH_CONTOURS,
+                                landmark_drawing_spec = drawing_spec,
+                                connection_drawing_spec=drawing_spec
+                            )
+
+            # Fps Counter Logic
+            # currTime = time.time()
+            # if not ('prevTime' in locals()):
+            #     prevTime = 0
+            # fps = 1 / (currTime - prevTime)
+            # prevTime = currTime
+
+            # Dash board                
+            # kpi1_text.write(f"<h1 style='text-align: center; color: red;'>{int(fps)}</h1>", unsafe_allow_html=True)
+            # kpi2_text.write(f"<h1 style='text-align: center; color: red;'>{face_count}</h1>", unsafe_allow_html=True)
+           
+
+            return img
+
+
+    webrtc_streamer(key="example", video_transformer_factory=VideoTransformer)
 
 
     

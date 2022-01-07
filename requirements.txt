@@ -2,5 +2,5 @@ mediapipe
 pillow
 numpy
 streamlit
-
+streamlit_webrtc
 
